@@ -1,0 +1,173 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: scratch-pipeline-
+spec:
+  arguments:
+    parameters:
+    - name: txt
+      value: good morningf
+    - name: val
+      value: '7'
+  entrypoint: scratch-pipeline
+  serviceAccountName: pipeline-runner
+  templates:
+  - container:
+      args: []
+      command:
+      - python
+      - -m
+      - nuclio
+      - deploy
+      - /lbr/nuclio-generator.ipynb
+      - --dashboard-url
+      - http://default-tenant-nuclio-dashboard:8070
+      - --name
+      - datagen
+      - --project
+      - NetopsPipeline
+      - --tag
+      - ''
+      - --env-json
+      - ''
+      - --spec-json
+      - ''
+      - --mount
+      - ''
+      env:
+      - name: V3IO_API
+        value: v3io-webapi.default-tenant.svc:8081
+      - name: V3IO_USERNAME
+        value: iguazio
+      - name: V3IO_ACCESS_KEY
+        value: ce35907d-38be-4b67-bb8a-44a04a3feb3b
+      image: nuclio/pydeploy
+      volumeMounts:
+      - mountPath: /lbr
+        name: v3io
+    name: nuclio-deploy
+    outputs:
+      artifacts:
+      - name: mlpipeline-ui-metadata
+        optional: true
+        path: /mlpipeline-ui-metadata.json
+      - name: mlpipeline-metrics
+        optional: true
+        path: /mlpipeline-metrics.json
+      parameters:
+      - name: nuclio-deploy-endpoint
+        valueFrom:
+          path: /tmp/output
+  - container:
+      args: []
+      command:
+      - python
+      - -m
+      - nuclio
+      - deploy
+      - /lbr/nuclio-data-preparations.ipynb
+      - --dashboard-url
+      - http://default-tenant-nuclio-dashboard:8070
+      - --name
+      - dataprep
+      - --project
+      - NetopsPipeline
+      - --tag
+      - ''
+      - --env-json
+      - ''
+      - --spec-json
+      - ''
+      - --mount
+      - ''
+      env:
+      - name: V3IO_API
+        value: v3io-webapi.default-tenant.svc:8081
+      - name: V3IO_USERNAME
+        value: iguazio
+      - name: V3IO_ACCESS_KEY
+        value: ce35907d-38be-4b67-bb8a-44a04a3feb3b
+      image: nuclio/pydeploy
+      volumeMounts:
+      - mountPath: /lbr
+        name: v3io
+    name: nuclio-deploy-2
+    outputs:
+      artifacts:
+      - name: mlpipeline-ui-metadata
+        optional: true
+        path: /mlpipeline-ui-metadata.json
+      - name: mlpipeline-metrics
+        optional: true
+        path: /mlpipeline-metrics.json
+      parameters:
+      - name: nuclio-deploy-2-endpoint
+        valueFrom:
+          path: /tmp/output
+  - container:
+      args: []
+      command:
+      - python
+      - -m
+      - nuclio
+      - deploy
+      - /lbr/nuclio-training.ipynb
+      - --dashboard-url
+      - http://default-tenant-nuclio-dashboard:8070
+      - --name
+      - train
+      - --project
+      - NetopsPipeline
+      - --tag
+      - ''
+      - --env-json
+      - ''
+      - --spec-json
+      - ''
+      - --mount
+      - ''
+      env:
+      - name: V3IO_API
+        value: v3io-webapi.default-tenant.svc:8081
+      - name: V3IO_USERNAME
+        value: iguazio
+      - name: V3IO_ACCESS_KEY
+        value: ce35907d-38be-4b67-bb8a-44a04a3feb3b
+      image: nuclio/pydeploy
+      volumeMounts:
+      - mountPath: /lbr
+        name: v3io
+    name: nuclio-deploy-3
+    outputs:
+      artifacts:
+      - name: mlpipeline-ui-metadata
+        optional: true
+        path: /mlpipeline-ui-metadata.json
+      - name: mlpipeline-metrics
+        optional: true
+        path: /mlpipeline-metrics.json
+      parameters:
+      - name: nuclio-deploy-3-endpoint
+        valueFrom:
+          path: /tmp/output
+  - dag:
+      tasks:
+      - name: nuclio-deploy
+        template: nuclio-deploy
+      - dependencies:
+        - nuclio-deploy
+        name: nuclio-deploy-2
+        template: nuclio-deploy-2
+      - dependencies:
+        - nuclio-deploy-2
+        name: nuclio-deploy-3
+        template: nuclio-deploy-3
+    name: scratch-pipeline
+  volumes:
+  - flexVolume:
+      driver: v3io/fuse
+      options:
+        accessKey: ce35907d-38be-4b67-bb8a-44a04a3feb3b
+        container: bigdata
+        subPath: /lbr
+    name: v3io
